@@ -24,10 +24,11 @@ body{font-family:'DM Mono',monospace;background:var(--bg);color:var(--text);min-
 .nav-btn{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:var(--sidebar-muted);font-size:12px;letter-spacing:0.04em;transition:background 0.15s,color 0.15s;white-space:nowrap;border:none;background:none;width:100%;text-align:left;}
 .nav-btn:hover{background:var(--sidebar-hover);color:var(--sidebar-text);}
 .nav-btn.active{background:var(--sidebar-active);color:var(--sidebar-text);}
-.nav-icon{font-size:15px;flex-shrink:0;width:20px;text-align:center;}
+.nav-icon{font-size:16px;flex-shrink:0;width:20px;display:flex;align-items:center;justify-content:center;}
 .nav-label{overflow:hidden;opacity:1;transition:opacity 0.2s;}
-#sidebar.col .nav-label{opacity:0;pointer-events:none;}
-#sidebar.col .nav-btn{justify-content:center;padding:9px 0;}
+#sidebar.col .nav-label{opacity:0;pointer-events:none;width:0;overflow:hidden;}
+#sidebar.col .nav-btn{justify-content:center;padding:9px 0;gap:0;}
+#sidebar.col .nav-icon{width:56px;font-size:17px;}
 #main{margin-left:var(--sw);flex:1;min-height:100vh;transition:margin-left 0.25s ease;display:flex;flex-direction:column;}
 #sidebar.col~#main{margin-left:56px;}
 .topbar{position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:1px solid var(--border);padding:0 28px;height:54px;display:flex;align-items:center;gap:14px;transition:background 0.3s;}
