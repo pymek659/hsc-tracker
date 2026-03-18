@@ -67,6 +67,30 @@ body { font-family:'DM Mono',monospace; background:var(--bg); color:var(--text);
 
 .sidebar-bottom { padding:12px 8px; border-top:1px solid rgba(255,255,255,0.08); display:flex; flex-direction:column; gap:2px; }
 
+/* Centre nav icons when collapsed */
+#sidebar.collapsed .nav-item { justify-content:center; padding:9px 0; }
+#sidebar.collapsed .sidebar-logo { justify-content:center; }
+
+/* ── PiP TIMER ── */
+#pip-window {
+  display:none; position:fixed; bottom:24px; right:24px; z-index:999;
+  background:var(--sidebar); border-radius:18px; padding:16px 20px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.28); cursor:move;
+  user-select:none; min-width:180px; text-align:center;
+  border:1px solid rgba(255,255,255,0.1);
+}
+#pip-window.visible { display:block; }
+.pip-phase { font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:rgba(255,255,255,0.45); margin-bottom:6px; }
+.pip-time { font-family:'Instrument Serif',serif; font-size:38px; font-weight:400; color:#fff; line-height:1; letter-spacing:-1px; margin-bottom:10px; }
+.pip-bar-track { height:4px; background:rgba(255,255,255,0.12); border-radius:2px; overflow:hidden; margin-bottom:12px; }
+.pip-bar-fill { height:100%; border-radius:2px; transition:width 1s linear, background 0.3s; }
+.pip-controls { display:flex; gap:8px; justify-content:center; align-items:center; }
+.pip-btn { background:rgba(255,255,255,0.12); border:none; border-radius:8px; color:#fff; font-family:'DM Mono',monospace; font-size:11px; padding:5px 12px; cursor:pointer; transition:background 0.15s; }
+.pip-btn:hover { background:rgba(255,255,255,0.22); }
+.pip-btn.primary { background:rgba(255,255,255,0.25); }
+.pip-close { position:absolute; top:8px; right:10px; background:none; border:none; color:rgba(255,255,255,0.4); font-size:14px; cursor:pointer; line-height:1; padding:2px 4px; border-radius:4px; }
+.pip-close:hover { color:#fff; background:rgba(255,255,255,0.1); }
+
 /* ── MAIN CONTENT ── */
 #main {
   margin-left:var(--sidebar-w); flex:1; min-height:100vh;
@@ -440,6 +464,7 @@ body { font-family:'DM Mono',monospace; background:var(--bg); color:var(--text);
         <button class="pomo-btn secondary" onclick="resetPomo()">Reset</button>
         <button class="pomo-btn primary" id="pomo-start-btn" onclick="togglePomo()">Start</button>
         <button class="pomo-btn secondary" onclick="skipPomo()">Skip</button>
+        <button class="pomo-btn secondary" id="pip-btn" onclick="togglePip()" title="Pop out timer">⧉ PiP</button>
       </div>
 
       <div class="pomo-sessions">Sessions completed today: <span id="pomo-sessions">0</span></div>
@@ -550,6 +575,19 @@ body { font-family:'DM Mono',monospace; background:var(--bg); color:var(--text);
       <button class="add-cancel" onclick="closeSubjectModal()">Cancel</button>
       <button class="add-confirm" onclick="saveSubjectModal()">Save</button>
     </div>
+  </div>
+</div>
+
+<!-- ── PiP TIMER WINDOW ── -->
+<div id="pip-window">
+  <button class="pip-close" onclick="closePip()">✕</button>
+  <div class="pip-phase" id="pip-phase-pip">Focus Session</div>
+  <div class="pip-time" id="pip-time">25:00</div>
+  <div class="pip-bar-track"><div class="pip-bar-fill" id="pip-bar" style="width:100%;background:#16a34a"></div></div>
+  <div class="pip-controls">
+    <button class="pip-btn" onclick="resetPomo()">↺</button>
+    <button class="pip-btn primary" id="pip-start-btn" onclick="togglePomo()">Start</button>
+    <button class="pip-btn" onclick="skipPomo()">⏭</button>
   </div>
 </div>
 
@@ -1214,26 +1252,43 @@ function setPomoMode(mode){
 }
 function updatePomoDisplay(){
   const m=Math.floor(pomoSecondsLeft/60),s=pomoSecondsLeft%60;
-  document.getElementById('pomo-display').textContent=`${pad(m)}:${pad(s)}`;
+  const timeStr=`${pad(m)}:${pad(s)}`;
+  document.getElementById('pomo-display').textContent=timeStr;
   const phases={focus:'Focus Session',short:'Short Break',long:'Long Break'};
-  document.getElementById('pomo-phase').textContent=phases[pomoMode];
+  const phaseStr=phases[pomoMode];
+  document.getElementById('pomo-phase').textContent=phaseStr;
   const ring=document.getElementById('pomo-ring');
   const progress=pomoSecondsLeft/pomoTotalSeconds;
   ring.style.strokeDashoffset=CIRCUMFERENCE*(1-progress);
+  // sync PiP
+  const pipTime=document.getElementById('pip-time');
+  if(pipTime)pipTime.textContent=timeStr;
+  const pipPhase=document.getElementById('pip-phase-pip');
+  if(pipPhase)pipPhase.textContent=phaseStr;
+  const pipBar=document.getElementById('pip-bar');
+  if(pipBar){
+    pipBar.style.width=(progress*100)+'%';
+    pipBar.style.background=pomoMode==='focus'?'#16a34a':pomoMode==='short'?'#2563eb':'#7c3aed';
+  }
+}
+function syncPomoBtn(text){
+  document.getElementById('pomo-start-btn').textContent=text;
+  const pipBtn=document.getElementById('pip-start-btn');
+  if(pipBtn)pipBtn.textContent=text;
 }
 function togglePomo(){
   if(pomoRunning){
     clearInterval(pomoInterval);pomoRunning=false;
-    document.getElementById('pomo-start-btn').textContent='Resume';
+    syncPomoBtn('Resume');
   }else{
     pomoRunning=true;
-    document.getElementById('pomo-start-btn').textContent='Pause';
+    syncPomoBtn('Pause');
     pomoInterval=setInterval(()=>{
       pomoSecondsLeft--;
       updatePomoDisplay();
       if(pomoSecondsLeft<=0){
         clearInterval(pomoInterval);pomoRunning=false;
-        document.getElementById('pomo-start-btn').textContent='Start';
+        syncPomoBtn('Start');
         if(pomoMode==='focus'){
           pomoCompletedToday++;
           appSettings.pomoSessions=pomoCompletedToday;
@@ -1255,13 +1310,13 @@ function togglePomo(){
 }
 function resetPomo(){
   clearInterval(pomoInterval);pomoRunning=false;
-  document.getElementById('pomo-start-btn').textContent='Start';
+  syncPomoBtn('Start');
   pomoSecondsLeft=pomoTotalSeconds=getPomoSeconds(pomoMode);
   updatePomoDisplay();
 }
 function skipPomo(){
   clearInterval(pomoInterval);pomoRunning=false;
-  document.getElementById('pomo-start-btn').textContent='Start';
+  syncPomoBtn('Start');
   pomoSecondsLeft=0;updatePomoDisplay();
   if(pomoMode==='focus'){
     pomoCompletedToday++;appSettings.pomoSessions=pomoCompletedToday;
@@ -1270,6 +1325,38 @@ function skipPomo(){
     setPomoMode(pomoCompletedToday%until===0?'long':'short');
   }else{setPomoMode('focus');}
 }
+
+/* PiP */
+let pipVisible=false;
+function togglePip(){
+  pipVisible=!pipVisible;
+  document.getElementById('pip-window').classList.toggle('visible',pipVisible);
+  document.getElementById('pip-btn').textContent=pipVisible?'⧉ Hide PiP':'⧉ PiP';
+  updatePomoDisplay();
+}
+function closePip(){
+  pipVisible=false;
+  document.getElementById('pip-window').classList.remove('visible');
+  document.getElementById('pip-btn').textContent='⧉ PiP';
+}
+
+// PiP drag
+(function(){
+  let drag=false,ox=0,oy=0;
+  const win=document.getElementById('pip-window');
+  win.addEventListener('mousedown',e=>{
+    if(e.target.classList.contains('pip-btn')||e.target.classList.contains('pip-close'))return;
+    drag=true;ox=e.clientX-win.offsetLeft;oy=e.clientY-win.offsetTop;
+    win.style.cursor='grabbing';
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!drag)return;
+    win.style.left=Math.max(0,Math.min(window.innerWidth-win.offsetWidth,e.clientX-ox))+'px';
+    win.style.top=Math.max(0,Math.min(window.innerHeight-win.offsetHeight,e.clientY-oy))+'px';
+    win.style.right='auto';win.style.bottom='auto';
+  });
+  document.addEventListener('mouseup',()=>{drag=false;win.style.cursor='move';});
+})();
 function updatePomoSettings(){
   pomoTotalSeconds=getPomoSeconds(pomoMode);
   pomoSecondsLeft=pomoTotalSeconds;
@@ -1321,5 +1408,87 @@ document.getElementById('pomo-sessions').textContent=pomoCompletedToday;
 tick();
 setInterval(tick,1000);
 </script>
+<!-- PiP OVERLAY -->
+<div id="pip-overlay" style="display:none;position:fixed;z-index:999;bottom:28px;right:28px;background:var(--sidebar);border-radius:20px;padding:20px 24px;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,0.35);user-select:none;cursor:move;" onmousedown="pipDragStart(event)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <span id="pip-phase" style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.5);">Focus Session</span>
+    <button onclick="togglePip()" style="background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 12px;" title="Close PiP">✕</button>
+  </div>
+  <div style="text-align:center;margin-bottom:12px;">
+    <svg width="100" height="100" viewBox="0 0 100 100" style="transform:rotate(-90deg)">
+      <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="5"/>
+      <circle id="pip-ring" cx="50" cy="50" r="44" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round"
+        stroke-dasharray="276.5" stroke-dashoffset="0" style="transition:stroke-dashoffset 1s linear,stroke 0.3s;"/>
+    </svg>
+    <div id="pip-time" style="position:absolute;margin-top:-68px;width:100px;text-align:center;font-family:'Instrument Serif',serif;font-size:26px;color:#fff;letter-spacing:-1px;font-variant-numeric:tabular-nums;">25:00</div>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;">
+    <button onclick="togglePomo()" id="pip-start-btn" style="flex:1;padding:7px;background:rgba(255,255,255,0.15);border:none;border-radius:8px;color:#fff;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">Start</button>
+    <button onclick="resetPomo()" style="padding:7px 12px;background:rgba(255,255,255,0.08);border:none;border-radius:8px;color:rgba(255,255,255,0.6);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background='rgba(255,255,255,0.08)'">↺</button>
+  </div>
+</div>
+
+<script>
+/* ── PiP ── */
+let pipOpen=false;
+function togglePip(){
+  pipOpen=!pipOpen;
+  document.getElementById('pip-overlay').style.display=pipOpen?'block':'none';
+  document.getElementById('pip-btn').textContent=pipOpen?'✕ PiP':'⧉ PiP';
+  if(pipOpen)updatePipDisplay();
+}
+
+function updatePipDisplay(){
+  const m=Math.floor(pomoSecondsLeft/60),s=pomoSecondsLeft%60;
+  const timeEl=document.getElementById('pip-time');
+  if(timeEl)timeEl.textContent=`${pad(m)}:${pad(s)}`;
+  const phases={focus:'Focus Session',short:'Short Break',long:'Long Break'};
+  const phaseEl=document.getElementById('pip-phase');
+  if(phaseEl)phaseEl.textContent=phases[pomoMode]||'Focus Session';
+  const ring=document.getElementById('pip-ring');
+  if(ring){
+    const CIRC=276.5;
+    ring.style.strokeDashoffset=CIRC*(1-(pomoSecondsLeft/pomoTotalSeconds));
+    ring.style.stroke=pomoMode==='focus'?'#22c55e':pomoMode==='short'?'#3b82f6':'#a855f7';
+  }
+  const startBtn=document.getElementById('pip-start-btn');
+  if(startBtn)startBtn.textContent=pomoRunning?'Pause':'Start';
+}
+
+// hook into the existing tick to also update pip
+const _origTick=tick;
+function tick(){
+  _origTick();
+  if(pipOpen)updatePipDisplay();
+}
+
+// also sync pip start button when main start button changes
+const _origTogglePomo=togglePomo;
+function togglePomo(){
+  _origTogglePomo();
+  if(pipOpen)updatePipDisplay();
+}
+
+/* PiP drag */
+let _pipDragging=false,_pipX=0,_pipY=0;
+function pipDragStart(e){
+  if(e.target.tagName==='BUTTON')return;
+  _pipDragging=true;
+  const el=document.getElementById('pip-overlay');
+  const rect=el.getBoundingClientRect();
+  _pipX=e.clientX-rect.left;_pipY=e.clientY-rect.top;
+  document.addEventListener('mousemove',pipDragMove);
+  document.addEventListener('mouseup',pipDragEnd);
+}
+function pipDragMove(e){
+  if(!_pipDragging)return;
+  const el=document.getElementById('pip-overlay');
+  el.style.left=(e.clientX-_pipX)+'px';
+  el.style.top=(e.clientY-_pipY)+'px';
+  el.style.bottom='auto';el.style.right='auto';
+}
+function pipDragEnd(){_pipDragging=false;document.removeEventListener('mousemove',pipDragMove);document.removeEventListener('mouseup',pipDragEnd);}
+</script>
+
 </body>
 </html>
